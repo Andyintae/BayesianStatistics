@@ -1,0 +1,170 @@
+---
+title: "Modeling and prediction for movies based on Bayesian"
+
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+library(BAS)
+library(GGally)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `movies`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+This dataset includes information from Rotten Tomatoes and IMDB for a random sample of movies. And the dataset is comprised of 651 randomly sampled movies produced and released before 2016. Observations in the sample are collected by random sampling method. Therefore we can generalize the result.  
+However there is no random assignment. It is not experiment but observational study. Therefore we can not assume that there is causality.  
+And data were collected from someone who want to answer the questions. Therefore there can be some bias.  
+
+* * *
+
+## Part 2: Data manipulation
+
+1. manipulate variables to predict "audience_score"  
+2. select sutable variables  
+
+* feature_film: "yes" if title_type is Feature Film, "no" otherwise
+* drama: "yes" if genre is Drama, "no" otherwise
+* runtime
+* mpaa_rating_R: "yes" if mpaa_rating is R, "no" otherwise
+* thtr_rel_year
+* oscar_season: "yes" if movie is released in November, October, or December (based on thtr_rel_month), "no" otherwise
+* summer_season: "yes" if movie is released in May, June, July, or August (based on thtr_rel_month), "no" otherwise
+* imdb_rating
+* imdb_num_votes
+* critics_score
+* best_pic_nom
+* best_pic_win
+* best_actor_win
+* best_actress_win
+* best_dir_win
+* top200_box  
+* award_count: sum of awards (best_pic_nom, best_pic_win, best_actor_win, best_actress_win, best_dir_win, top200_box)
+
+```{r}
+movies_set <- movies %>% 
+    filter(!is.na(runtime)) %>% 
+    mutate(feature_film     = if_else(title_type == "Feature Film", "yes", "no"),
+           drama            = if_else(genre == "Drama", "yes", "no"),
+           mpaa_rating_R    = if_else(mpaa_rating == "R", "yes", "no"),
+           oscar_season     = if_else(thtr_rel_month %in% c("10","11","12"), "yes", "no"),
+           summer_season    = if_else(thtr_rel_month %in% c("5","6","7","8"), "yes", "no"),
+           best_pic_nom     = if_else(best_pic_nom == "no", 0, 1),
+           best_pic_win     = if_else(best_pic_win == "no", 0, 1),  
+           best_actor_win   = if_else(best_actor_win == "no", 0, 1),
+           best_actress_win = if_else(best_actress_win == "no", 0, 1),
+           best_dir_win     = if_else(best_dir_win == "no", 0, 1),
+           top200_box       = if_else(top200_box == "no", 0, 1),
+           award_count      = best_pic_win + best_pic_win + best_actor_win + best_actress_win + best_dir_win + top200_box,
+           thtr_rel_century = if_else(thtr_rel_year < 2000, "1900s", "2000s")
+           ) %>% 
+    select(audience_score, title, feature_film, drama, runtime, mpaa_rating_R, thtr_rel_year, thtr_rel_century,
+           oscar_season, summer_season, imdb_rating, imdb_num_votes, critics_score, 
+           best_pic_nom, best_pic_win, best_actor_win, best_actress_win, best_dir_win, top200_box, award_count)
+```
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+1. relationship between audience_score and the numeric variables  
+```{r}
+ggpairs(movies_set, columns = c("audience_score", "runtime", "thtr_rel_year", "imdb_rating", 
+                                "imdb_num_votes", "critics_score", "award_count"))
+```
+
+2. relationship between audience_score and feature_film  
+"feature_film : no" shows higher audience_score, however 90.8%(591 among 651) of films are "feature_film : yes".  
+```{r}
+table(movies_set$feature_film)
+movies_set %>% ggplot(aes(feature_film, audience_score)) +
+  geom_boxplot()
+```
+
+3. relationship between audience_score and drama  
+"Drama : yes" shows higher audience_score.
+```{r}
+table(movies_set$drama)
+movies_set %>% ggplot(aes(drama, audience_score)) +
+  geom_boxplot()
+```
+
+4. relationship between audience_score and mpaa_rating_R  
+"mpaa_rating_R : no" shows slightly higher audience_score.
+```{r}
+table(movies_set$mpaa_rating_R)
+movies_set %>% ggplot(aes(mpaa_rating_R, audience_score)) +
+  geom_boxplot()
+```
+
+5. relationship between audience_score and thtr_rel_year
+It's vary based on theater released year. Therefore I made new variable, "thtr_rel_century"
+```{r}
+table(movies_set$thtr_rel_year)
+movies_set %>% ggplot(aes(as.factor(thtr_rel_year), audience_score)) +
+  geom_boxplot()
+```
+
+6. relationship between audience_score and thtr_rel_century   
+It is difficult to see any different from 1900s to 2000s.  
+```{r}
+table(movies_set$thtr_rel_century)
+movies_set %>% ggplot(aes(as.factor(thtr_rel_century), audience_score)) +
+  geom_boxplot()
+```
+
+7. relationship between audience_score and oscar_season   
+The movies, which are released to theaters during oscar season, show higher audience_score.
+```{r}
+table(movies_set$oscar_season)
+movies_set %>% ggplot(aes(oscar_season, audience_score)) +
+  geom_boxplot()
+```
+
+8. relationship between audience_score and summer_season     
+The movies, which are released to theaters during summer season, show slightly lower audience_score.
+```{r}
+table(movies_set$summer_season)
+movies_set %>% ggplot(aes(summer_season, audience_score)) +
+  geom_boxplot()
+```
+
+* * *
+
+## Part 4: Modeling
+
+NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
+button above. Make sure that your code is visible in the project you submit. 
+Delete this note when before you submit your work.
+
+* * *
+
+## Part 5: Prediction
+
+NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
+button above. Make sure that your code is visible in the project you submit. 
+Delete this note when before you submit your work.
+
+* * *
+
+## Part 6: Conclusion
+
